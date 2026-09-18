@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .services.ingestion import load_uploaded_file
+from .services.generation import generation_service
 from .services.retrieval import retrieval_service
 
 
@@ -60,9 +61,21 @@ def search(request: QueryRequest) -> dict[str, object]:
 
 @app.post("/api/chat")
 def chat(request: QueryRequest) -> dict[str, object]:
+    if not generation_service.is_configured():
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY is not configured")
     documents = retrieval_service.search(request.query, request.source)
+    if not documents:
+        return {
+            "answer": "I could not find relevant information in the selected sources.",
+            "citations": [],
+            "query": request.query,
+        }
+    try:
+        answer = generation_service.answer(request.query, documents)
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     return {
-        "answer": "Retrieved context is ready for the answer generation step.",
-        "citations": [document.metadata["source"] for document in documents],
+        "answer": answer,
+        "citations": sorted({document.metadata["source"] for document in documents}),
         "query": request.query,
     }

@@ -1,15 +1,23 @@
-import os
 from pathlib import Path
 from uuid import uuid4
 
-os.environ.setdefault("USE_TF", "0")
-os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
-
 from langchain_chroma import Chroma
+from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 from langchain_core.retrievers import BaseRetriever
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+
+class ChromaEmbeddings(Embeddings):
+    def __init__(self) -> None:
+        self._embedding_function = DefaultEmbeddingFunction()
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self._embedding_function(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._embedding_function([text])[0]
 
 
 class RetrievalService:
@@ -24,14 +32,9 @@ class RetrievalService:
 
     def _get_retriever(self) -> BaseRetriever:
         if self._retriever is None:
-            embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2",
-                model_kwargs={"device": "cpu"},
-                encode_kwargs={"normalize_embeddings": True},
-            )
             self._vector_store = Chroma(
                 collection_name="knowledge_documents",
-                embedding_function=embeddings,
+                embedding_function=ChromaEmbeddings(),
                 persist_directory=str(Path(__file__).resolve().parents[2] / "data" / "chroma"),
             )
             self._retriever = self._vector_store.as_retriever(
