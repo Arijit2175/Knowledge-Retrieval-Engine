@@ -50,8 +50,23 @@ class RetrievalService:
         self._vector_store.add_documents(chunks)
         return document_id
 
-    def search(self, query: str) -> list[Document]:
-        return self._get_retriever().invoke(query)
+    def search(self, query: str, source: str | None = None) -> list[Document]:
+        self._get_retriever()
+        assert self._vector_store is not None
+        if source:
+            return self._vector_store.similarity_search(query, k=4, filter={"source": source})
+        assert self._retriever is not None
+        return self._retriever.invoke(query)
+
+    def list_sources(self) -> list[dict[str, str]]:
+        self._get_retriever()
+        assert self._vector_store is not None
+        records = self._vector_store.get(include=["metadatas"])
+        sources: dict[str, str] = {}
+        for metadata in records.get("metadatas", []):
+            if metadata and metadata.get("source"):
+                sources[metadata["source"]] = metadata.get("document_id", "")
+        return [{"filename": filename, "id": document_id} for filename, document_id in sources.items()]
 
 
 retrieval_service = RetrievalService()

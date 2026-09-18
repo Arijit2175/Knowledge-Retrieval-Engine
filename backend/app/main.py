@@ -20,6 +20,7 @@ app.add_middleware(
 
 class QueryRequest(BaseModel):
     query: str
+    source: str | None = None
 
 
 @app.get("/api/health")
@@ -40,9 +41,14 @@ async def upload_document(file: Annotated[UploadFile, File()]) -> dict[str, str]
     }
 
 
+@app.get("/api/documents")
+def list_documents() -> dict[str, list[dict[str, str]]]:
+    return {"documents": retrieval_service.list_sources()}
+
+
 @app.post("/api/search")
 def search(request: QueryRequest) -> dict[str, object]:
-    documents = retrieval_service.search(request.query)
+    documents = retrieval_service.search(request.query, request.source)
     return {
         "query": request.query,
         "results": [
