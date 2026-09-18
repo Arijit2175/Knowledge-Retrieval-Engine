@@ -1,5 +1,9 @@
+import os
 from pathlib import Path
 from uuid import uuid4
+
+os.environ.setdefault("USE_TF", "0")
+os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
