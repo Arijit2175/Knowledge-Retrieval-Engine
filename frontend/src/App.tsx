@@ -27,6 +27,10 @@ function App() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
+  const [chatAnswer, setChatAnswer] = useState("");
+  const [chatCitations, setChatCitations] = useState<string[]>([]);
+  const [chatting, setChatting] = useState(false);
+  const [chatError, setChatError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,11 +70,30 @@ function App() {
     }
   };
 
-  const submitQuery = (event: React.FormEvent) => {
+  const submitQuery = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!query.trim()) return;
     setView("chat");
     setMessage(query.trim());
+    setChatting(true);
+    setChatError("");
+    try {
+      const response = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: query.trim(), source: selectedSource || null }),
+      });
+      if (!response.ok) throw new Error("Conversation request failed");
+      const data = (await response.json()) as { answer: string; citations: string[] };
+      setChatAnswer(data.answer);
+      setChatCitations(data.citations);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Conversation request failed");
+      setChatAnswer("");
+      setChatCitations([]);
+    } finally {
+      setChatting(false);
+    }
   };
 
   const handleSearch = async (event: React.FormEvent) => {
@@ -132,7 +155,7 @@ function App() {
           <div className="stat-strip"><div><strong>{uploaded.length}</strong><span>sources indexed</span></div><div><strong>—</strong><span>answers so far</span></div><div><strong>Local</strong><span>private by default</span></div></div>
         </section>}
 
-        {view === "chat" && <section className="conversation-view"><div className="conversation-heading"><div className="eyebrow"><span className="eyebrow-line" /> CONVERSATION</div><h2>{message || "Your knowledge, in conversation."}</h2><p>Grounded answers will appear here with the sources that support them.</p></div><div className="answer-placeholder"><Sparkles size={20} /><div><strong>Ready when you are.</strong><p>Connect the retrieval pipeline to turn your sources into cited answers.</p></div></div><form className="search-box compact" onSubmit={submitQuery}><Search size={20} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ask a follow-up question..." aria-label="Ask a follow-up" /><button type="submit"><Send size={17} /></button></form></section>}
+        {view === "chat" && <section className="conversation-view"><div className="conversation-heading"><div className="eyebrow"><span className="eyebrow-line" /> CONVERSATION</div><h2>{message || "Your knowledge, in conversation."}</h2><p>Grounded answers will appear here with the sources that support them.</p></div>{chatting && <div className="answer-placeholder"><Sparkles size={20} /><div><strong>Retrieving context...</strong><p>Searching the selected sources.</p></div></div>}{chatError && <p className="search-status">{chatError}</p>}{chatAnswer && <div className="answer-placeholder"><Sparkles size={20} /><div><strong>{chatAnswer}</strong>{chatCitations.length > 0 && <p>Citations: {chatCitations.join(", ")}</p>}</div></div>}<form className="search-box compact" onSubmit={submitQuery}><Search size={20} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ask a follow-up question..." aria-label="Ask a follow-up" /><button type="submit" disabled={chatting}><Send size={17} /></button></form></section>}
 
         {view === "sources" && <section className="sources-view"><div className="section-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> KNOWLEDGE BASE</div><h2>Your sources</h2><p>Documents that give your workspace its memory.</p>{uploading && <p>Indexing selected files...</p>}{uploadError && <p>{uploadError}</p>}</div><button className="upload-button" onClick={() => fileInput.current?.click()} disabled={uploading}><Upload size={17} /> {uploading ? "Indexing..." : "Add sources"}</button></div><div className="source-grid">{uploaded.map((name) => <button className="source-card" key={name} type="button" onClick={() => { setSelectedSource(name); setView("search"); }}><div className="file-icon mint"><FileText size={21} /></div><strong>{name}</strong><span>Click to search this document</span><div className="indexed"><CheckCircle2 size={14} /> Indexed</div></button>)}<button className="drop-card" onClick={() => fileInput.current?.click()}><Upload size={21} /><strong>Drop files here</strong><span>PDF, DOCX, MD, TXT</span></button></div></section>}
       </main>

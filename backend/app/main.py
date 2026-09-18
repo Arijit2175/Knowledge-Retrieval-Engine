@@ -60,7 +60,7 @@ def search(request: QueryRequest) -> dict[str, object]:
 
 @app.post("/api/chat")
 def chat(request: QueryRequest) -> dict[str, object]:
-    documents = retrieval_service.search(request.query)
+    documents = retrieval_service.search(request.query, request.source)
     return {
         "answer": "Retrieved context is ready for the answer generation step.",
         "citations": [document.metadata["source"] for document in documents],
