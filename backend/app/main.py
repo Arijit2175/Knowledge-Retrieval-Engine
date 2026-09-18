@@ -4,6 +4,7 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from .services.ingestion import load_uploaded_file
 from .services.retrieval import retrieval_service
 
 
@@ -28,13 +29,14 @@ def health() -> dict[str, str]:
 
 @app.post("/api/documents")
 async def upload_document(file: Annotated[UploadFile, File()]) -> dict[str, str]:
-    content = (await file.read()).decode("utf-8", errors="replace")
-    document_id = retrieval_service.add_document(content, file.filename or "untitled")
+    filename = file.filename or "untitled"
+    documents = load_uploaded_file(filename, await file.read())
+    document_id = retrieval_service.add_documents(documents, filename)
     return {
         "id": document_id,
         "filename": file.filename or "untitled",
         "status": "indexed",
-        "message": "Document added to the LangChain retrieval index.",
+        "message": "Document split, embedded, and added to the local Chroma index.",
     }
 
 
